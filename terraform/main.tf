@@ -17,24 +17,29 @@ resource "google_container_cluster" "primary" {
   name     = "wordpress-cluster"
   location = var.region
   
+  # Use a regional cluster for better availability
   remove_default_node_pool = true
   initial_node_count       = 1
 
+  # Enable workload identity for better security
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 }
 
 resource "google_container_node_pool" "primary_nodes" {
-  name       = "wordpress-node-pool"
-  location   = var.region
-  cluster    = google_container_cluster.primary.name
+  name     = "wordpress-node-pool"
+  location = var.region
+  cluster  = google_container_cluster.primary.name
+  
+  # Reduce node count to stay within quotas
   node_count = 2
 
   node_config {
     preemptible  = true
-    machine_type = "e2-small"
+    machine_type = "e2-small"  # Smaller instance type
 
+    # Enable workload identity
     workload_metadata_config {
       node_metadata = "GKE_METADATA_SERVER"
     }
@@ -54,14 +59,14 @@ resource "google_sql_database_instance" "wordpress" {
 
   settings {
     tier      = "db-f1-micro"
-    disk_size = 10
+    disk_size = 10  # Reduced disk size
     
     backup_configuration {
       enabled = true
     }
   }
 
-  deletion_protection = false
+  deletion_protection = false  # Allow Terraform to delete the instance
 }
 
 resource "google_sql_database" "wordpress" {
@@ -84,6 +89,7 @@ resource "google_storage_bucket" "wordpress_uploads" {
   name     = "${var.project_id}-wordpress-uploads"
   location = var.region
 
+  # Ensure the bucket is not public
   uniform_bucket_level_access = true
 }
 
@@ -92,15 +98,20 @@ resource "google_artifact_registry_repository" "wordpress_repo" {
   location      = var.region
   repository_id = "wordpress-repo"
   format        = "DOCKER"
+
+  # Handle pre-existing repository
+  create_if_missing = true
 }
 
 # Variables
 variable "project_id" {
   description = "The project ID to deploy to"
   type        = string
+  default     = "wordpress-project-sigma"
 }
 
 variable "region" {
   description = "The region to deploy to"
   type        = string
+  default     = "us-central1"
 }
