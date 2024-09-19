@@ -7,7 +7,7 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA']
 
-# Run Terraform init, plan, and apply with error handling and rollback
+# Run Terraform init, plan, and apply with error handling
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
   args:
@@ -18,50 +18,37 @@ steps:
     terraform plan -out=tfplan
     if terraform apply -auto-approve tfplan; then
       echo "Terraform apply succeeded"
+      echo "TERRAFORM_SUCCESS=true" >> $BUILDER_OUTPUT/terraform_status
     else
-      error_code=$?
-      echo "Terraform apply failed with exit code $error_code"
-      if [ $error_code -eq 1 ]; then
-        echo "This may be due to pre-existing resources. Continuing the build..."
-      else
-        echo "Rolling back changes..."
-        terraform destroy -auto-approve
-        exit 1
-      fi
+      echo "Terraform apply failed"
+      echo "TERRAFORM_SUCCESS=false" >> $BUILDER_OUTPUT/terraform_status
+      exit 1
     fi
   env:
   - 'TF_VAR_project_id=${PROJECT_ID}'
   - 'TF_VAR_region=${_REGION}'
 
-# Get GKE credentials
+# Get GKE credentials and deploy if Terraform was successful
 - name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'sh'
   args:
   - '-c'
   - |
-    gcloud container clusters get-credentials ${_CLUSTER_NAME} --region ${_REGION} --project ${PROJECT_ID}
-
-# Create Kubernetes secret for database password
-- name: 'gcr.io/cloud-builders/kubectl'
-  entrypoint: 'sh'
-  args:
-  - '-c'
-  - |
-    echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
-  secretEnv: ['DB_PASSWORD']
-
-# Deploy to GKE
-- name: 'gcr.io/cloud-builders/kubectl'
-  entrypoint: 'sh'
-  args:
-  - '-c'
-  - |
-    kubectl apply -f kubernetes/
-    if [ $? -ne 0 ]; then
-      echo "Kubernetes deployment failed. Rolling back..."
-      kubectl delete -f kubernetes/
+    if [ "$(cat $BUILDER_OUTPUT/terraform_status | grep TERRAFORM_SUCCESS=true)" ]; then
+      gcloud container clusters get-credentials ${_CLUSTER_NAME} --region ${_REGION} --project ${PROJECT_ID}
+      
+      echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
+      
+      kubectl apply -f kubernetes/
+      if [ $? -ne 0 ]; then
+        echo "Kubernetes deployment failed."
+        exit 1
+      fi
+    else
+      echo "Skipping Kubernetes deployment due to Terraform failure"
       exit 1
     fi
+  secretEnv: ['DB_PASSWORD']
 
 substitutions:
   _REGION: us-central1
