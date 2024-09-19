@@ -31,7 +31,7 @@ resource "google_container_node_pool" "primary_nodes" {
   name     = "wordpress-node-pool"
   location = var.region
   cluster  = google_container_cluster.primary.name
-  
+
   # Reduce node count to stay within quotas
   node_count = 2
 
@@ -41,7 +41,7 @@ resource "google_container_node_pool" "primary_nodes" {
 
     # Enable workload identity
     workload_metadata_config {
-      node_metadata = "GKE_METADATA_SERVER"
+      mode = "GKE_METADATA"
     }
 
     oauth_scopes = [
@@ -99,8 +99,6 @@ resource "google_artifact_registry_repository" "wordpress_repo" {
   repository_id = "wordpress-repo"
   format        = "DOCKER"
 
-  # Handle pre-existing repository
-  create_if_missing = true
 }
 
 # Variables
