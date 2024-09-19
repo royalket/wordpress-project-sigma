@@ -1,64 +1,77 @@
 steps:
-# Install Terraform
-- name: 'gcr.io/cloud-builders/wget'
+# Download Terraform
+name: 'gcr.io/cloud-builders/wget'
   args: ['https://releases.hashicorp.com/terraform/1.0.0/terraform_1.0.0_linux_amd64.zip']
-- name: 'gcr.io/cloud-builders/wget'
+
+# Verify Terraform checksum
+name: 'gcr.io/cloud-builders/wget'
   args: ['https://releases.hashicorp.com/terraform/1.0.0/terraform_1.0.0_SHA256SUMS']
-- name: 'gcr.io/cloud-builders/wget'
+name: 'gcr.io/cloud-builders/wget'
   args: ['https://releases.hashicorp.com/terraform/1.0.0/terraform_1.0.0_SHA256SUMS.sig']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['run', '--rm', '-v', '/workspace:/workspace', 'alpine/openssl', 'sha256sum', '-c', 'terraform_1.0.0_SHA256SUMS']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['run', '--rm', '-v', '/workspace:/workspace', 'alpine', 'unzip', 'terraform_1.0.0_linux_amd64.zip']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['run', '--rm', '-v', '/workspace:/workspace', 'alpine', 'mv', 'terraform', '/usr/local/bin/']
-
-# Build the WordPress Docker image
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA', '.']
-
-# Push the image to Artifact Registry
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA']
-
-# Run Terraform init
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'sh'
-  args: 
-  - '-c'
-  - |
-      terraform init
-
-# Run Terraform plan
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'sh'
-  args: 
-  - '-c'
-  - | 
-      terraform plan
-
-# Run Terraform apply
-- name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'sh'
-  args: 
-  - '-c'
-  - | 
-      terraform apply -auto-approve
-
-# Create Kubernetes secret for database password
-- name: 'gcr.io/cloud-builders/kubectl'
+name: 'gcr.io/cloud-builders/gcloud'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-      echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin
+    sha256sum -c --ignore-missing terraform_1.0.0_SHA256SUMS
+
+# Install Terraform
+name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    apt-get update && apt-get install -y unzip
+    unzip terraform_1.0.0_linux_amd64.zip
+    mv terraform /usr/local/bin/
+    terraform version
+
+# Build the WordPress Docker image
+name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA', '.']
+
+# Push the image to Artifact Registry
+name: 'gcr.io/cloud-builders/docker'
+  args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA']
+
+# Run Terraform init
+name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args: 
+  - '-c'
+  - |
+    terraform init
+
+# Run Terraform plan
+name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args: 
+  - '-c'
+  - | 
+    terraform plan
+
+# Run Terraform apply
+name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
+  args: 
+  - '-c'
+  - | 
+    terraform apply -auto-approve
+
+# Create Kubernetes secret for database password
+name: 'gcr.io/cloud-builders/kubectl'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
   secretEnv: ['DB_PASSWORD']
 
 # Deploy to GKE
-- name: 'gcr.io/cloud-builders/kubectl'
+name: 'gcr.io/cloud-builders/kubectl'
   args:
   - 'apply'
   - '-f'
@@ -78,7 +91,7 @@ availableSecrets:
     env: 'DB_PASSWORD'
 
 images:
-- '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA'
+'${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA'
 
 options:
   logging: CLOUD_LOGGING_ONLY
