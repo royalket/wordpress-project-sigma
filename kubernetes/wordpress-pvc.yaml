@@ -4,7 +4,8 @@ metadata:
   name: wordpress-pvc
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany  # Changed from ReadWriteOnce to support multiple nodes
   resources:
     requests:
       storage: 10Gi
+  storageClassName: standard-rwo  # Adjust this based on your GKE storage class
