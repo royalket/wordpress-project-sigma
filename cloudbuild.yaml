@@ -2,11 +2,9 @@ steps:
 # Build the WordPress Docker image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', '${_REGION}-docker.pkg.dev/wordpress-project-sigma/${_REPO_NAME}/wordpress:$COMMIT_SHA', '.']
-
 # Push the image to Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/wordpress-project-sigma/${_REPO_NAME}/wordpress:$COMMIT_SHA']
-
 # Run Terraform init
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
@@ -15,7 +13,6 @@ steps:
   - |
       cd terraform
       terraform init
-
 # Run Terraform plan
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
@@ -24,7 +21,6 @@ steps:
   - | 
       cd terraform
       terraform plan
-
 # Run Terraform apply
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
@@ -33,7 +29,6 @@ steps:
   - | 
       cd terraform
       terraform apply -auto-approve
-
 # Create Kubernetes secret for database password
 - name: 'gcr.io/cloud-builders/kubectl'
   entrypoint: 'bash'
@@ -45,7 +40,6 @@ steps:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
   secretEnv: ['DB_PASSWORD']
-
 # Deploy to GKE
 - name: 'gcr.io/cloud-builders/kubectl'
   args:
@@ -55,18 +49,13 @@ steps:
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
-
 substitutions:
   _REGION: us-central1
   _REPO_NAME: wordpress-repo
-
 availableSecrets:
   secretManager:
   - versionName: projects/wordpress-project-sigma/secrets/wordpress-db-password/versions/latest
     env: 'DB_PASSWORD'
-
 images:
 - '${_REGION}-docker.pkg.dev/wordpress-project-sigma/${_REPO_NAME}/wordpress:$COMMIT_SHA'
-
-options:
-  logs_bucket: 'gs://my-logs-bucket'
+logsBucket: 'gs://my-logs-bucket'
