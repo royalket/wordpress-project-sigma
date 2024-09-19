@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: wordpress-pvc
+  name: wordpress-pvc-rwx
 spec:
   accessModes:
-    - ReadWriteMany  # Changed from ReadWriteOnce to support multiple nodes
+    - ReadWriteMany
   resources:
     requests:
       storage: 10Gi
-  storageClassName: standard-rwo  # Adjust this based on your GKE storage class
+  storageClassName: standard-rwx  # Make sure this storage class exists and supports ReadWriteMany

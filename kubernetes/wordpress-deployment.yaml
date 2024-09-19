@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: wordpress
 spec:
-  replicas: 2  # Increased to 2 to use both nodes
+  replicas: 2
   selector:
     matchLabels:
       app: wordpress
@@ -12,18 +12,6 @@ spec:
       labels:
         app: wordpress
     spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - wordpress
-              topologyKey: "kubernetes.io/hostname"
       containers:
       - name: wordpress
         image: us-central1-docker.pkg.dev/wordpress-project-sigma/wordpress-repo/wordpress:latest
@@ -50,14 +38,7 @@ spec:
         volumeMounts:
         - name: wordpress-persistent-storage
           mountPath: /var/www/html
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 256Mi
       volumes:
       - name: wordpress-persistent-storage
         persistentVolumeClaim:
-          claimName: wordpress-pvc
+          claimName: wordpress-pvc-rwx  # Updated to use the new PVC
