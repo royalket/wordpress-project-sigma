@@ -2,61 +2,83 @@ steps:
 # Build the WordPress Docker image
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA', '.']
+
 # Push the image to Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA']
-# Run Terraform init
+
+# Run Terraform init, plan, and apply with error handling and rollback
 - name: 'hashicorp/terraform:1.0.0'
-  entrypoint: 'sh'
+  entrypoint: 'bash'
   args:
   - '-c'
   - |
     cd terraform
     terraform init
-# Run Terraform plan
-- name: 'hashicorp/terraform:1.0.0'
-  entrypoint: 'sh'
+    terraform plan -out=tfplan
+    if terraform apply -auto-approve tfplan; then
+      echo "Terraform apply succeeded"
+    else
+      error_code=$?
+      echo "Terraform apply failed with exit code $error_code"
+      if [ $error_code -eq 1 ]; then
+        echo "This may be due to pre-existing resources. Continuing the build..."
+      else
+        echo "Rolling back changes..."
+        terraform destroy -auto-approve
+        exit 1
+      fi
+    fi
+  env:
+  - 'TF_VAR_project_id=${PROJECT_ID}'
+  - 'TF_VAR_region=${_REGION}'
+
+# Get GKE credentials
+- name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: 'bash'
   args:
   - '-c'
   - |
-    cd terraform
-    terraform plan
-# Run Terraform apply
-- name: 'hashicorp/terraform:1.0.0'
-  entrypoint: 'sh'
-  args:
-  - '-c'
-  - |
-    cd terraform
-    terraform apply -auto-approve
+    gcloud container clusters get-credentials ${_CLUSTER_NAME} --region ${_REGION} --project ${PROJECT_ID}
+
 # Create Kubernetes secret for database password
 - name: 'gcr.io/cloud-builders/kubectl'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-    echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin
-  env:
-  - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
+    echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
   secretEnv: ['DB_PASSWORD']
+
 # Deploy to GKE
 - name: 'gcr.io/cloud-builders/kubectl'
+  entrypoint: 'bash'
   args:
-  - 'apply'
-  - '-f'
-  - 'kubernetes/'
-  env:
-  - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
+  - '-c'
+  - |
+    kubectl apply -f kubernetes/
+    if [ $? -ne 0 ]; then
+      echo "Kubernetes deployment failed. Rolling back..."
+      kubectl delete -f kubernetes/
+      exit 1
+    fi
+
 substitutions:
   _REGION: us-central1
   _REPO_NAME: wordpress-repo
   _CLUSTER_NAME: wordpress-cluster
+
 availableSecrets:
   secretManager:
   - versionName: projects/wordpress-project-sigma/secrets/wordpress-db-password/versions/latest
     env: 'DB_PASSWORD'
+
 images:
 - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/wordpress:$COMMIT_SHA'
+
+options:
+  env:
+  - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
+
 logsBucket: 'gs://wordpress-project-sigma-logs'
