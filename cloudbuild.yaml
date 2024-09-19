@@ -9,7 +9,7 @@ steps:
 
 # Run Terraform init, plan, and apply with error handling and rollback
 - name: 'hashicorp/terraform:1.0.0'
-  entrypoint: 'bash'
+  entrypoint: 'sh'
   args:
   - '-c'
   - |
@@ -35,7 +35,7 @@ steps:
 
 # Get GKE credentials
 - name: 'gcr.io/cloud-builders/gcloud'
-  entrypoint: 'bash'
+  entrypoint: 'sh'
   args:
   - '-c'
   - |
@@ -43,7 +43,7 @@ steps:
 
 # Create Kubernetes secret for database password
 - name: 'gcr.io/cloud-builders/kubectl'
-  entrypoint: 'bash'
+  entrypoint: 'sh'
   args:
   - '-c'
   - |
@@ -52,7 +52,7 @@ steps:
 
 # Deploy to GKE
 - name: 'gcr.io/cloud-builders/kubectl'
-  entrypoint: 'bash'
+  entrypoint: 'sh'
   args:
   - '-c'
   - |
