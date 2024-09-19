@@ -30,3 +30,7 @@ steps:
 
 images:
 - 'us-central1-docker.pkg.dev/$PROJECT_ID/wordpress-repo/wordpress:$COMMIT_SHA'
+
+options:
+  logging: GCS_ONLY
+logsBucket: 'gs://wordpress-bucket-wordpress-project-sigma'

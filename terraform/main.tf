@@ -57,7 +57,12 @@ resource "google_sql_database" "wordpress" {
 resource "google_sql_user" "wordpress" {
   name = "wordpress"
   instance = google_sql_database_instance.wordpress.name
-  password = "CHANGE_ME_BEFORE_APPLYING" # You should change this and use Secret Manager in production
+  password = data.google_secret_manager_secret_version.db_password.secret_data
+}
+
+# Access the secret version
+data "google_secret_manager_secret_version" "db_password" {
+  secret = "wordpress-db-password"
 }
 
 # Create Artifact Registry repository
@@ -65,6 +70,15 @@ resource "google_artifact_registry_repository" "wordpress" {
   location = "us-central1"
   repository_id = "wordpress-repo"
   format = "DOCKER"
+}
+
+# Create a Google Cloud Storage bucket for WordPress uploads
+resource "google_storage_bucket" "wordpress_uploads" {
+  name = "wordpress-bucket-${var.project_id}"
+  location = "US"
+  force_destroy = true
+
+  uniform_bucket_level_access = true
 }
 
 # Output values
@@ -78,4 +92,13 @@ output "cloudsql_instance_name" {
 
 output "artifact_registry_repo" {
   value = google_artifact_registry_repository.wordpress.name
+}
+
+output "storage_bucket_name" {
+  value = google_storage_bucket.wordpress_uploads.name
+}
+
+variable "project_id" {
+  description = "The ID of the project"
+  default = "wordpress-project-sigma"
 }

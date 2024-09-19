@@ -21,10 +21,7 @@ spec:
         - name: WORDPRESS_DB_HOST
           value: "127.0.0.1"
         - name: WORDPRESS_DB_USER
-          valueFrom:
-            secretKeyRef:
-              name: wordpress-db-secrets
-              key: username
+          value: "wordpress"
         - name: WORDPRESS_DB_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -32,6 +29,12 @@ spec:
               key: password
         - name: WORDPRESS_DB_NAME
           value: "wordpress"
+        - name: WORDPRESS_CONFIG_EXTRA
+          value: |
+            define('AS3CF_SETTINGS', serialize( array(
+                'provider' => 'gcp',
+                'bucket' => 'wordpress-bucket-wordpress-project-sigma',
+            )));
         resources:
           requests:
             cpu: 100m
@@ -39,4 +42,3 @@ spec:
           limits:
             cpu: 500m
             memory: 256Mi
-
