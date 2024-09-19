@@ -8,34 +8,34 @@ steps:
 # Run Terraform init
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
-  args: 
+  args:
   - '-c'
   - |
-      cd terraform
-      terraform init
+    cd terraform
+    terraform init
 # Run Terraform plan
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
-  args: 
+  args:
   - '-c'
-  - | 
-      cd terraform
-      terraform plan
+  - |
+    cd terraform
+    terraform plan
 # Run Terraform apply
 - name: 'hashicorp/terraform:1.0.0'
   entrypoint: 'sh'
-  args: 
+  args:
   - '-c'
-  - | 
-      cd terraform
-      terraform apply -auto-approve
+  - |
+    cd terraform
+    terraform apply -auto-approve
 # Create Kubernetes secret for database password
 - name: 'gcr.io/cloud-builders/kubectl'
   entrypoint: 'bash'
   args:
   - '-c'
   - |
-      echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin
+    echo "$$DB_PASSWORD" | kubectl create secret generic wordpress-db-secret --from-file=password=/dev/stdin
   env:
   - 'CLOUDSDK_COMPUTE_REGION=${_REGION}'
   - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
