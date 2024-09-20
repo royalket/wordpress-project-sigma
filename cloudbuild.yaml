@@ -42,3 +42,7 @@ options:
   - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
 
 serviceAccount: 'projects/wordpress-project-sigma/serviceAccounts/cloudsql-proxy@wordpress-project-sigma.iam.gserviceaccount.com'
+
+options:
+  logging: GCS_ONLY
+logsBucket: 'gs://wordpress-bucket-wordpress-project-sigma'
