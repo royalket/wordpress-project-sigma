@@ -31,7 +31,7 @@ images:
   - 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA'
 
 substitutions:
-  _COMPUTE_ZONE: us-central1
+  _COMPUTE_REGION: us-central1
   _CLUSTER_NAME: wordpress-cluster
   _WORDPRESS_IP: # Add your WordPress service IP here after deployment
 
