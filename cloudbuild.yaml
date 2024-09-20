@@ -1,14 +1,17 @@
 steps:
   # Build the WordPress Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
     args: ['build', '-t', 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA', '.']
 
   # Push the image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'push'
     args: ['push', 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA']
 
   # Deploy to GKE
   - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'deploy'
     args:
       - 'set'
       - 'image'
@@ -20,8 +23,8 @@ steps:
 
   # Test the deployment
   - name: 'gcr.io/cloud-builders/curl'
-    args: ['-f', 'http://${_WORDPRESS_IP}']
     id: 'test'
+    args: ['-f', 'http://${_WORDPRESS_IP}']
     waitFor: ['deploy']
 
 images:
