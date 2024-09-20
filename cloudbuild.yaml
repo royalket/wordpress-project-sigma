@@ -44,7 +44,7 @@ images:
 substitutions:
   _COMPUTE_REGION: us-central1
   _CLUSTER_NAME: wordpress-cluster
-  _WORDPRESS_IP: # Add your WordPress service IP here after deployment
+  _WORDPRESS_IP: 34.41.162.18
 
 options:
   substitution_option: 'ALLOW_LOOSE'
