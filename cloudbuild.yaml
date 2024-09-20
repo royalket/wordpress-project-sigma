@@ -1,48 +1,40 @@
 steps:
-# Build the Docker image
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/wordpress:$COMMIT_SHA', '.']
+  # Build the WordPress Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA', '.']
 
-# Push the image to Container Registry
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'gcr.io/$PROJECT_ID/wordpress:$COMMIT_SHA']
+  # Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA']
 
-# Update the kubernetes deployment to use the new image
-- name: 'gcr.io/cloud-builders/kubectl'
-  args:
-  - 'set'
-  - 'image'
-  - 'deployment/wordpress'
-  - 'wordpress=gcr.io/$PROJECT_ID/wordpress:$COMMIT_SHA'
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-a'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
+  # Deploy to GKE
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/wordpress'
+      - 'wordpress=gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_COMPUTE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
 
-# Apply all resources from the single YAML file
-- name: 'gcr.io/cloud-builders/kubectl'
-  args: ['apply', '-f', 'kubernetes/wordpress_cloudsql.yaml']
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-a'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
-
-# Deploy using gke-deploy
-- name: 'gcr.io/cloud-builders/gke-deploy'
-  args:
-  - run
-  - --filename=kubernetes/wordpress_cloudsql.yaml
-  - --location=us-central1-a
-  - --cluster=wordpress-cluster
+  # Test the deployment
+  - name: 'gcr.io/cloud-builders/curl'
+    args: ['-f', 'http://${_WORDPRESS_IP}']
+    id: 'test'
+    waitFor: ['deploy']
 
 images:
-- 'gcr.io/$PROJECT_ID/wordpress:$COMMIT_SHA'
+  - 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA'
+
+substitutions:
+  _COMPUTE_ZONE: us-central1-a
+  _CLUSTER_NAME: wordpress-cluster
+  _WORDPRESS_IP: # Add your WordPress service IP here after deployment
 
 options:
-  env:
-  - 'CLOUDSDK_COMPUTE_ZONE=us-central1-a'
-  - 'CLOUDSDK_CONTAINER_CLUSTER=wordpress-cluster'
-
-serviceAccount: 'projects/wordpress-project-sigma/serviceAccounts/cloudsql-proxy@wordpress-project-sigma.iam.gserviceaccount.com'
+  substitution_option: 'ALLOW_LOOSE'
 
 options:
   logging: GCS_ONLY
-logsBucket: 'gs://wordpress-bucket-wordpress-project-sigma'
+logsBucket: 'gs://wordpress-project-sigma-media/logs'

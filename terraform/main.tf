@@ -1,132 +1,120 @@
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
-    }
-  }
-}
-
 provider "google" {
   project = "wordpress-project-sigma"
-  region  = "us-central1"
-  zone    = "us-central1-a"
+  region = var.region
 }
 
 # GKE Cluster
 resource "google_container_cluster" "primary" {
-  name               = "wordpress-cluster"
-  location           = "us-central1-a"
-  initial_node_count = 1
+  name     = "wordpress-cluster"
+  location = var.region
+
+  remove_default_node_pool = true
+  initial_node_count       = 1
+
+  networking_mode = "VPC_NATIVE"
+  ip_allocation_policy {}
+}
+
+resource "google_container_node_pool" "primary_nodes" {
+  name       = "wordpress-node-pool"
+  location   = var.region
+  cluster    = google_container_cluster.primary.name
+  node_count = 1  # Reduced from 2 to 1
 
   node_config {
-    machine_type = "e2-small"
-    disk_size_gb = 10
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/devstorage.read_only"
+    ]
+
+    labels = {
+      env = "wordpress-project-sigma"
+    }
+
+    machine_type = "e2-medium"  # Changed from n1-standard-1 to e2-medium
+    tags         = ["gke-node", "wordpress-gke"]
+    metadata = {
+      disable-legacy-endpoints = "true"
+    }
+
+    disk_size_gb = 20  # Reduced disk size to 20 GB
+    disk_type    = "pd-standard"  # Changed from SSD to standard persistent disk
   }
 }
 
-# Cloud SQL instance
+
+# Cloud SQL
 resource "google_sql_database_instance" "wordpress" {
-  name             = "wordpress-db-instance"
+  name = "wordpress-mysql"
   database_version = "MYSQL_5_7"
-  region           = "us-central1"
+  region = var.region
 
   settings {
     tier      = "db-f1-micro"
     disk_size = 10
   }
+
+  deletion_protection = false
 }
 
-# Cloud SQL database
-resource "google_sql_database" "wordpress_db" {
-  name     = "wordpress"
+resource "google_sql_database" "wordpress" {
+  name = "wordpress"
   instance = google_sql_database_instance.wordpress.name
 }
 
-# Data sources for Secret Manager secrets
-data "google_secret_manager_secret_version" "db_username" {
-  secret = "wordpress-db-username"
-}
-
-data "google_secret_manager_secret_version" "db_password" {
-  secret = "wordpress-db-password"
-}
-
-# Cloud SQL user
-resource "google_sql_user" "wordpress_user" {
-  name     = data.google_secret_manager_secret_version.db_username.secret_data
+resource "google_sql_user" "wordpress" {
+  name = "wordpress-project-sigma"
   instance = google_sql_database_instance.wordpress.name
-  password = data.google_secret_manager_secret_version.db_password.secret_data
+  password = "Aniket123"
 }
 
-# GCS Bucket
-resource "google_storage_bucket" "wordpress_content" {
-  name     = "wordpress-content-bucket-sigma"
-  location = "US"
+# Cloud Storage Bucket
+resource "google_storage_bucket" "wordpress_media" {
+  name = "wordpress-project-sigma-media"
+  location = var.region
 }
 
-# Service Account for Cloud SQL proxy
-resource "google_service_account" "cloudsql_proxy" {
-  account_id   = "cloudsql-proxy"
-  display_name = "Cloud SQL Proxy Service Account"
+# IAM
+resource "google_service_account" "wordpress" {
+  account_id = "wordpress-sa"
+  display_name = "WordPress Service Account"
 }
 
-# IAM binding for Cloud SQL client role
-resource "google_project_iam_member" "cloudsql_client" {
+resource "google_project_iam_member" "wordpress_storage_admin" {
   project = "wordpress-project-sigma"
-  role    = "roles/cloudsql.client"
-  member  = "serviceAccount:${google_service_account.cloudsql_proxy.email}"
+  role = "roles/storage.admin"
+  member = "serviceAccount:${google_service_account.wordpress.email}"
 }
 
-# Service Account key for Cloud SQL proxy
-resource "google_service_account_key" "cloudsql_proxy_key" {
-  service_account_id = google_service_account.cloudsql_proxy.name
+# Variables
+variable "region" {
+  description = "GCP region"
+  default     = "us-central1"
 }
 
-# Kubernetes Secret for Cloud SQL proxy credentials
-resource "kubernetes_secret" "cloudsql_proxy_credentials" {
-  metadata {
-    name = "cloudsql-instance-credentials"
-  }
-
-  data = {
-    "key.json" = base64decode(google_service_account_key.cloudsql_proxy_key.private_key)
-  }
+variable "gke_num_nodes" {
+  default = 2
+  description = "Number of GKE nodes"
 }
 
-# Kubernetes Secret for database credentials
-resource "kubernetes_secret" "cloudsql_db_credentials" {
-  metadata {
-    name = "cloudsql-db-credentials"
-  }
-
-  data = {
-    username = data.google_secret_manager_secret_version.db_username.secret_data
-    password = data.google_secret_manager_secret_version.db_password.secret_data
-  }
-}
-
-# IAM binding for Secret Manager secret accessor role
-resource "google_secret_manager_secret_iam_member" "secret_accessor_username" {
-  secret_id = "wordpress-db-username"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudsql_proxy.email}"
-}
-
-resource "google_secret_manager_secret_iam_member" "secret_accessor_password" {
-  secret_id = "wordpress-db-password"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloudsql_proxy.email}"
-}
-
-output "gke_cluster_name" {
+# Outputs
+output "kubernetes_cluster_name" {
   value = google_container_cluster.primary.name
+  description = "GKE Cluster Name"
 }
 
-output "cloudsql_instance_connection_name" {
-  value = google_sql_database_instance.wordpress.connection_name
+output "kubernetes_cluster_host" {
+  value = google_container_cluster.primary.endpoint
+  description = "GKE Cluster Host"
 }
 
-output "gcs_bucket_name" {
-  value = google_storage_bucket.wordpress_content.name
+output "db_instance_name" {
+  value = google_sql_database_instance.wordpress.name
+  description = "Cloud SQL Instance Name"
+}
+
+output "storage_bucket_name" {
+  value = google_storage_bucket.wordpress_media.name
+  description = "GCS Bucket Name"
 }
