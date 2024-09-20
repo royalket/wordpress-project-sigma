@@ -29,7 +29,7 @@ steps:
 - name: 'gcr.io/cloud-builders/gke-deploy'
   args:
   - run
-  - --filename=wordpress_cloudsql.yaml
+  - --filename=kubernetes/wordpress_cloudsql.yaml
   - --location=us-central1-a
   - --cluster=wordpress-cluster
 
