@@ -9,6 +9,11 @@ steps:
     id: 'push'
     args: ['push', 'gcr.io/wordpress-project-sigma/wordpress:$COMMIT_SHA']
 
+  # Deploy the deployment YAML
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'deploy-deployment'
+    args: ['apply', '-f', 'wordpress-deployment.yaml']
+    
   # Deploy to GKE
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'deploy'
