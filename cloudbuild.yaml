@@ -11,9 +11,15 @@ steps:
 
   # Deploy the deployment YAML
   - name: 'gcr.io/cloud-builders/kubectl'
-    id: 'deploy-deployment'
-    args: ['apply', '-f', 'wordpress-deployment.yaml']
-    
+    id: 'apply'
+    args:
+      - 'apply'
+      - '-f'
+      - 'wordpress-deployment.yaml'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=${_COMPUTE_REGION}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_CLUSTER_NAME}'
+
   # Deploy to GKE
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'deploy'
