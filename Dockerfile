@@ -23,6 +23,7 @@ RUN set -ex; \
     rm -rf /var/lib/apt/lists/*
 
 # Install the Google Cloud Storage WordPress plugin
+RUN apt-get update && apt-get install -y unzip
 RUN curl -O https://downloads.wordpress.org/plugin/google-cloud-storage.zip \
     && unzip google-cloud-storage.zip -d /usr/src/wordpress/wp-content/plugins/ \
     && rm google-cloud-storage.zip
